@@ -1,0 +1,78 @@
+## @file
+# rustupaint UEFI application module.
+#
+# ENTRY_POINT is UefiMain, reached through UefiApplicationEntryPoint.
+# The C side is only the port lifecycle + main-loop pacing; the whole
+# application lives in Rust (see ../rust and UefiMain.c's file header).
+#
+# --- 为什么用 /DEFAULTLIB: 而不是 INF 的 [Binaries] 段 ---
+# [Binaries] 在 BaseTools 里被解析（MetaFileParser / InfBuildData），但它
+# 的语义是"本模块以预编译二进制交付"（Binaries 非空且 Sources 为空时才
+# 走那条路）——把一个 IL 库混进**有源码**的模块不是它的用法。
+# /LIBPATH: + /DEFAULTLIB: 是 MSVC 的既定机制，等价于源码里的
+# #pragma comment(lib, ...)：link.exe 会在所有对象文件之后再到该目录
+# 里解析缺失的外部符号，因此**与链接顺序无关**，不会出现"库排在对象
+# 之前导致符号解析不到"的问题。
+#
+# $(MODULE_DIR) 由 BaseTools 在展开 BuildOptions 时替换为本 INF 所在
+# 目录；rp_core.lib 由 tools/Build-RustPaint.ps1 从 cargo 产物规范化后拷进来
+# （该 .lib 与 qemu_disk/ 一样不入库）。
+#
+# Copyright (c) 2026, Mike Wu. All rights reserved.
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = rustupaint
+  FILE_GUID                      = E4B9D2C7-81A5-4E36-9F2B-07C1D8A45E93
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 0.1
+  ENTRY_POINT                    = UefiMain
+
+[BuildOptions]
+  # NOTE: a module-level CC_FLAGS line REPLACES the toolchain's flags rather
+  # than appending to them, so this module is compiled without the toolchain's
+  # trailing /WX- and therefore runs with warnings-as-errors. That is
+  # intentional (it caught a missing <Library/BaseMemoryLib.h> include on the
+  # first build), but it means new C code here must be warning-clean.
+  MSFT:*_*_*_CC_FLAGS = /DEDK2_BUILD /utf-8 /wd4819 /wd4100
+  # The static library is called rp_core, NOT rustupaint. EDK2 names the
+  # module's own object archive "<BASE_NAME>.lib", so a library called
+  # rustupaint.lib would collide with it and the linker would resolve the
+  # module's own archive instead -- producing
+  #   rustupaint.lib(UefiMain.obj) : error LNK2001: unresolved rp_app_build
+  # (which is exactly what happened on the first link attempt).
+  #
+  # It is passed as a plain input file after /LIBPATH:, NOT via
+  # /DEFAULTLIB:rp_core. EDK2's link rule always starts with /NODEFAULTLIB,
+  # which makes link.exe ignore every /DEFAULTLIB directive (both the command
+  # line switch and #pragma comment(lib,...) in objects). Two failed link
+  # attempts established that. A library named directly on the command line is
+  # an input file, so /NODEFAULTLIB does not apply to it.
+  #
+  # (INF [Binaries] is not an option either: EDK2 only CopyBinaryFiles()s those
+  # entries -- they never reach the link line.)
+  MSFT:*_*_*_LINK_FLAGS = /SUBSYSTEM:EFI_APPLICATION /LIBPATH:$(MODULE_DIR) rp_core.lib
+  MSFT:*_*_*_DLINK_FLAGS = /SUBSYSTEM:EFI_APPLICATION /LIBPATH:$(MODULE_DIR) rp_core.lib
+
+[Sources]
+  UefiMain.c
+  RpShim.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  LvglPkg/LvglPkg.dec
+  RustPaintPkg/RustPaintPkg.dec
+
+[LibraryClasses]
+  UefiLib
+  UefiApplicationEntryPoint
+  BaseLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  DebugLib
+  UefiBootServicesTableLib
+  PrintLib
+  LvglLib
+  LvglUefiPort

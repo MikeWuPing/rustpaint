@@ -1,0 +1,28 @@
+[package]
+name = "rustupaint"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "rustupaint"
+# 关键：Rust 侧只产出**静态库**，最终的 .efi 由 EDK2 的 VS2019 链接器产出
+# （见 RustPaintPkg/Application/RustPaint/RustPaint.inf 的 /DEFAULTLIB: 段）。
+# 这样 EDK2 侧保留全部既有约定（DSC/INF、LvglPkg 链接、版本断言通道），
+# Rust 只贡献逻辑。
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+
+[profile.dev]
+# UEFI 里没有 unwind 基础设施，panic strategy 必须是 abort。
+panic = "abort"
+# dev 档也给点优化：LVGL 在 QEMU 下本来就慢，别让未优化代码拖后腿。
+opt-level = 1
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+codegen-units = 1
+# 静态库阶段做 LTO 意义有限（跨语言 LTO 在 EDK2 链接器侧不成立），
+# 但关掉增量与瘦身对体积有好处。
+debug = false

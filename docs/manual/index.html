@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rustupaint 产品手册</title>
+<style>
+  :root{
+    --bg:#f3f3f3; --card:#ffffff; --panel:#fafafa; --border:#e5e5e5;
+    --strong:#d0d0d0; --text:#1b1b1b; --text2:#616161; --text3:#9a9a9a;
+    --accent:#0067c0; --accent-soft:#d6e7f8; --code:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    font-size:15px; line-height:1.75;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px 96px}
+  header.hero{
+    background:linear-gradient(180deg,#ffffff 0%,#fafcff 100%);
+    border-bottom:1px solid var(--border); padding:52px 0 40px; margin-bottom:36px;
+  }
+  header.hero .wrap{padding-bottom:0}
+  h1{font-size:38px;margin:0 0 6px;letter-spacing:-.5px}
+  h1 .sub{font-size:16px;font-weight:400;color:var(--text3);margin-left:14px}
+  .lede{color:var(--text2);max-width:760px;margin:14px 0 0}
+  .badges{margin-top:20px;display:flex;gap:8px;flex-wrap:wrap}
+  .badge{
+    display:inline-block;background:var(--accent-soft);color:#0a4f92;
+    border-radius:999px;padding:3px 12px;font-size:12.5px;font-weight:600;
+  }
+  .badge.gray{background:#ececec;color:var(--text2)}
+  h2{
+    font-size:24px;margin:56px 0 18px;padding-bottom:10px;
+    border-bottom:2px solid var(--border);
+  }
+  h3{font-size:18px;margin:34px 0 12px}
+  h4{font-size:15.5px;margin:22px 0 8px;color:var(--text)}
+  p{margin:10px 0}
+  a{color:var(--accent)}
+  code{
+    background:var(--code);border:1px solid var(--border);border-radius:4px;
+    padding:1px 5px;font-size:13px;
+    font-family:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:22px 24px;margin:18px 0;
+  }
+  figure{margin:22px 0}
+  figure img{width:100%;display:block;border:1px solid var(--strong);border-radius:8px}
+  figcaption{color:var(--text2);font-size:13.5px;margin-top:8px;text-align:center}
+  .shot-narrow{max-width:560px;margin-left:auto;margin-right:auto}
+  .shot-mid{max-width:760px;margin-left:auto;margin-right:auto}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14.5px}
+  th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:var(--panel);font-weight:600}
+  td code{white-space:nowrap}
+  .kbd{
+    display:inline-block;background:#fff;border:1px solid var(--strong);
+    border-bottom-width:2px;border-radius:5px;padding:1px 7px;font-size:12.5px;
+    font-family:inherit;color:var(--text);margin:0 1px;
+  }
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .tool{
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:14px;display:flex;flex-direction:column;
+  }
+  .tool img{width:100%;border:1px solid var(--border);border-radius:6px}
+  .tool b{display:block;margin:10px 0 2px;font-size:15px}
+  .tool span{color:var(--text2);font-size:13.5px;line-height:1.6}
+  .note{
+    border-left:4px solid var(--accent);background:#f2f8fe;
+    padding:12px 18px;border-radius:0 8px 8px 0;margin:18px 0;color:#123a5e;
+  }
+  .note.warn{border-left-color:#d97706;background:#fff8ec;color:#6b3f07}
+  .toc{
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:18px 24px;margin:0 0 8px;
+  }
+  .toc ol{margin:0;padding-left:22px;columns:2;column-gap:36px}
+  .toc li{margin:4px 0}
+  .toc a{text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  footer{
+    margin-top:64px;padding-top:22px;border-top:1px solid var(--border);
+    color:var(--text3);font-size:13.5px;
+  }
+  @media (max-width:760px){
+    .grid2,.grid3{grid-template-columns:1fr}
+    .toc ol{columns:1}
+    h1{font-size:29px} h1 .sub{display:block;margin:6px 0 0}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>rustupaint <span class="sub">UEFI Shell 上的小画家</span></h1>
+    <p class="lede">
+      一个运行在 UEFI Shell 里的画图程序：逻辑用 <b>Rust</b> 编写，界面与渲染交给
+      <b>LVGL 9.2.2</b>，由 EDK2 负责把它链接成一个 UEFI 应用。没有操作系统，
+      没有窗口管理器 —— 从固件直接进入画布。
+    </p>
+    <div class="badges">
+      <span class="badge">版本 0.1.0.24</span>
+      <span class="badge gray">x86_64 UEFI</span>
+      <span class="badge gray">Rust + LVGL 9.2.2</span>
+      <span class="badge gray">EDK2 / VS2019</span>
+      <span class="badge gray">作者 Mike Wu</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc">
+    <ol>
+      <li><a href="#launch">运行与启动</a></li>
+      <li><a href="#overview">界面总览</a></li>
+      <li><a href="#toolbar">工具栏（八个工具）</a></li>
+      <li><a href="#palette">调色板</a></li>
+      <li><a href="#drawing">绘图操作</a></li>
+      <li><a href="#menus">菜单</a></li>
+      <li><a href="#keyboard">键盘与焦点</a></li>
+      <li><a href="#statusbar">状态栏</a></li>
+      <li><a href="#about">关于对话框</a></li>
+      <li><a href="#demo">完整操作演示</a></li>
+      <li><a href="#reference">速查表</a></li>
+      <li><a href="#limits">已知限制</a></li>
+    </ol>
+  </nav>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="launch">1. 运行与启动</h2>
+
+  <p>把 <code>rustupaint.efi</code> 放进一个 FAT 分区，在 UEFI Shell 下直接执行即可。</p>
+
+  <table>
+    <tr><th style="width:26%">项目</th><th>说明</th></tr>
+    <tr><td>运行环境</td><td>UEFI Shell（x86_64），需要 GOP 图形输出与一个指针设备</td></tr>
+    <tr><td>指针设备</td><td>USB 鼠标（boot 协议即可）；PS/2 与 usb-tablet 不可用</td></tr>
+    <tr><td>推荐分辨率</td><td>1280 × 800（本手册截图即此分辨率，画布 1208 × 648）</td></tr>
+    <tr><td>最小分辨率</td><td>320 × 240，低于此值会拒绝启动并打印原因</td></tr>
+    <tr><td>依赖</td><td>无。字库已内建，镜像约 1.4 MB</td></tr>
+  </table>
+
+  <div class="note">
+    <b>在 QEMU 下试玩：</b>用仓库里的
+    <code>tools\Run-RustPaintQemu.ps1 -Interactive</code> 启动，
+    会弹出一个可交互的 SDL 窗口。鼠标点进窗口后按
+    <span class="kbd">左 Ctrl</span> + <span class="kbd">左 Alt</span> 可以把指针释放回宿主机。
+  </div>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="overview">2. 界面总览</h2>
+
+  <p>整个界面自上而下分成五个区域，全部中文化，配色沿用 Win11 的浅色观感。</p>
+
+  <figure>
+    <img src="images/01-overview.png" alt="rustupaint 主界面">
+    <figcaption>启动后的主界面：标题栏 / 菜单栏 / 工具栏 / 画布 / 调色板 + 状态栏</figcaption>
+  </figure>
+
+  <table>
+    <tr><th style="width:22%">区域</th><th>内容</th></tr>
+    <tr><td>标题栏</td><td>应用名、当前画布尺寸、右上角作者署名</td></tr>
+    <tr><td>菜单栏</td><td><b>文件</b>、<b>编辑</b>、<b>帮助</b></td></tr>
+    <tr><td>工具栏</td><td>八个工具按钮（纯图标，鼠标悬停出提示）</td></tr>
+    <tr><td>画布</td><td>实际作画区域，带 1px 描边与淡投影</td></tr>
+    <tr><td>底部</td><td>调色板（当前色预览 + 16 个色块）与状态栏</td></tr>
+  </table>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="toolbar">3. 工具栏（八个工具）</h2>
+
+  <p>
+    左侧工具条是<b>纯图标</b>的。图标再象形也不如一行字明确，所以鼠标在按钮上
+    停留约 <b>0.4 秒</b>，右边就会浮出一个提示框，写明工具名和一句用法。
+    下面八张图就是实际悬停时的画面。
+  </p>
+
+  <figure>
+    <img src="images/tools.gif" alt="八个工具的悬浮提示">
+    <figcaption>鼠标依次划过八个工具按钮，逐个弹出提示（实机录制）</figcaption>
+  </figure>
+
+  <div class="grid2">
+    <figure class="tool"><img src="images/tool-0-pencil.png" alt="铅笔">
+      <b>铅笔</b><span>按住拖动自由手绘，落笔为圆形笔尖</span></figure>
+    <figure class="tool"><img src="images/tool-1-eraser.png" alt="橡皮">
+      <b>橡皮</b><span>按住拖动，把经过的像素擦成白色</span></figure>
+    <figure class="tool"><img src="images/tool-2-line.png" alt="直线">
+      <b>直线</b><span>按住拖动画直线，松开落定</span></figure>
+    <figure class="tool"><img src="images/tool-3-rect.png" alt="矩形">
+      <b>矩形</b><span>按住拖动画空心矩形边框</span></figure>
+    <figure class="tool"><img src="images/tool-4-ellipse.png" alt="椭圆">
+      <b>椭圆</b><span>按住拖动画空心椭圆边框</span></figure>
+    <figure class="tool"><img src="images/tool-5-fill.png" alt="填充">
+      <b>填充</b><span>点一下，把同色连通区域填成当前色</span></figure>
+    <figure class="tool"><img src="images/tool-6-picker.png" alt="取色">
+      <b>取色</b><span>点一下画布，把该点颜色设为当前色</span></figure>
+    <figure class="tool"><img src="images/tool-7-clear.png" alt="清空">
+      <b>清空</b><span>一次动作：清空整幅画布，随后回到上一个工具</span></figure>
+  </div>
+
+  <div class="note">
+    <b>「清空」不是持续工具。</b>点它就执行一次，然后自动回到你之前用的工具 ——
+    否则每次清空后都要手动切回去，很烦。
+  </div>
+
+  <figure class="shot-narrow">
+    <img src="images/closeup-toolbar.png" alt="工具栏特写">
+    <figcaption>工具栏特写：选中态（铅笔）为强调色浅底 + 图标变色，提示框贴在其右侧</figcaption>
+  </figure>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="palette">4. 调色板</h2>
+
+  <p>
+    底部一行 16 个色块，最左边的大方块是<b>当前色预览</b>。点任意色块即切换当前色，
+    铅笔、直线、矩形、椭圆、填充都用它。浅色块（白、浅灰）带 1px 描边，
+    否则在浅色底上会「消失」。
+  </p>
+
+  <figure>
+    <img src="images/closeup-palette.png" alt="调色板特写">
+    <figcaption>调色板特写：左侧为当前色预览，右侧 16 色</figcaption>
+  </figure>
+
+  <table>
+    <tr><th style="width:14%">顺序</th><th>颜色</th></tr>
+    <tr><td>第 1–4 个</td><td>黑、灰、浅灰、白</td></tr>
+    <tr><td>第 5–8 个</td><td>深红、红、橙、黄</td></tr>
+    <tr><td>第 9–12 个</td><td>绿、蓝绿、青、蓝</td></tr>
+    <tr><td>第 13–16 个</td><td>靛、紫、品红、棕</td></tr>
+  </table>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="drawing">5. 绘图操作</h2>
+
+  <p>
+    八种工具的用法可以归成三类：<b>点一下</b>（填充、取色、清空）、
+    <b>按住拖动</b>（铅笔、橡皮、直线、矩形、椭圆）。
+    下面逐帧演示一遍完整的作画过程。
+  </p>
+
+  <h3>5.1 铅笔：选色后自由手绘</h3>
+  <p>先在调色板点红色，再按住左键在画布上拖动，画出自由曲线。</p>
+  <figure><img src="images/demo-01-pencil.png" alt="铅笔绘制">
+    <figcaption>红色铅笔画出的一条波浪线</figcaption></figure>
+
+  <h3>5.2 直线：按住拖动画一条直线</h3>
+  <p>换蓝色，选直线工具，从起点拖到终点松手。</p>
+  <figure><img src="images/demo-02-line.png" alt="直线绘制">
+    <figcaption>蓝色直线</figcaption></figure>
+
+  <h3>5.3 矩形：拖出空心边框</h3>
+  <figure><img src="images/demo-03-rect.png" alt="矩形绘制">
+    <figcaption>绿色矩形边框</figcaption></figure>
+
+  <h3>5.4 椭圆：拖出外接矩形即得椭圆</h3>
+  <figure><img src="images/demo-04-ellipse.png" alt="椭圆绘制">
+    <figcaption>橙色椭圆</figcaption></figure>
+
+  <h3>5.5 填充：点一下填满同色区域</h3>
+  <p>换成橙色，选填充工具，在刚才的矩形内部点一下 —— 矩形内腔被整片填满。</p>
+  <figure><img src="images/demo-05-fill.png" alt="区域填充">
+    <figcaption>矩形内部被橙色填满</figcaption></figure>
+
+  <h3>5.6 取色：把画布上的颜色「吸」过来</h3>
+  <p>选取色工具，在填好的橙色区域点一下。注意底部：当前色预览和状态栏的颜色都已变成橙色。</p>
+  <figure><img src="images/demo-06-picker.png" alt="取色">
+    <figcaption>取色后，当前色与状态栏同步变为 <code>#FF8C00</code></figcaption></figure>
+
+  <h3>5.7 撤销</h3>
+  <p>「编辑」菜单里的撤销，可以回退最近一次绘制动作。</p>
+  <figure><img src="images/demo-07-undo.png" alt="撤销">
+    <figcaption>撤销之后的画布</figcaption></figure>
+
+  <div class="note warn">
+    <b>关于性能：</b>填充是逐像素扫描线算法，在 QEMU 这种无加速的虚拟显卡上，
+    填充很大面积（接近整块画布）会看到明显的卡顿。真机上受限于 GOP 的逐像素拷贝，
+    同样会慢，只是幅度小些。小区域填充没有感知。
+  </div>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="menus">6. 菜单</h2>
+
+  <p>菜单栏三个菜单，点标题展开、再点一次收起；点菜单以外的任何地方也会收起。</p>
+
+  <div class="grid2">
+    <figure><img src="images/menu-edit.png" alt="编辑菜单">
+      <figcaption><b>编辑</b>：撤销、清空</figcaption></figure>
+    <figure><img src="images/menu-help.png" alt="帮助菜单">
+      <figcaption><b>帮助</b>：关于</figcaption></figure>
+  </div>
+
+  <table>
+    <tr><th style="width:18%">菜单</th><th style="width:22%">菜单项</th><th>作用</th></tr>
+    <tr><td rowspan="2">文件</td><td>新建</td><td>清空画布，重新开始</td></tr>
+    <tr><td>退出</td><td>退出程序，返回 UEFI Shell</td></tr>
+    <tr><td rowspan="2">编辑</td><td>撤销</td><td>回退最近一次绘制</td></tr>
+    <tr><td>清空</td><td>清空整幅画布</td></tr>
+    <tr><td>帮助</td><td>关于</td><td>版本、作者与快捷键说明</td></tr>
+  </table>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="keyboard">7. 键盘与焦点</h2>
+
+  <p>
+    除了鼠标，整个界面也能用键盘操作。<span class="kbd">Tab</span> 在控件之间
+    移动焦点，获得焦点的控件会显示<b>蓝色强调色的焦点圈</b>；按
+    <span class="kbd">Enter</span> 等同于点它。
+  </p>
+
+  <div class="grid2">
+    <figure><img src="images/focus-0-initial.png" alt="初始状态">
+      <figcaption>初始状态，焦点在第一个菜单项</figcaption></figure>
+    <figure><img src="images/focus-1-tab.png" alt="Tab 切换后">
+      <figcaption>按 4 次 <span class="kbd">Tab</span> 后，焦点落到椭圆工具（焦点圈清晰可见）</figcaption></figure>
+  </div>
+
+  <table>
+    <tr><th style="width:24%">按键</th><th>作用</th></tr>
+    <tr><td><span class="kbd">Tab</span></td><td>焦点移到下一个控件（菜单 → 工具 → 色块）</td></tr>
+    <tr><td><span class="kbd">Shift</span> + <span class="kbd">Tab</span></td><td>焦点反向移动</td></tr>
+    <tr><td><span class="kbd">Enter</span></td><td>激活当前焦点控件</td></tr>
+    <tr><td><span class="kbd">Esc</span></td><td>关闭已展开的菜单或对话框</td></tr>
+  </table>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="statusbar">8. 状态栏</h2>
+
+  <figure>
+    <img src="images/closeup-status.png" alt="状态栏特写">
+    <figcaption>状态栏：当前工具、当前颜色、光标坐标、画布尺寸、版本号</figcaption>
+  </figure>
+
+  <p>从左到右分别是：</p>
+  <table>
+    <tr><th style="width:22%">字段</th><th>含义</th></tr>
+    <tr><td>工具</td><td>当前选中的工具名，切换工具即时更新</td></tr>
+    <tr><td>颜色</td><td>当前色，十六进制 <code>#RRGGBB</code>；取色后同步变化</td></tr>
+    <tr><td>位置</td><td>光标在<b>画布像素坐标系</b>里的位置（画布左上角为 0,0）</td></tr>
+    <tr><td>画布</td><td>画布像素尺寸</td></tr>
+    <tr><td>版本</td><td>版本号 + 构建时间戳</td></tr>
+  </table>
+
+  <figure class="shot-mid">
+    <img src="images/status-pos.png" alt="坐标实时更新">
+    <figcaption>光标停在画布 (600, 400) 处，状态栏显示 <code>位置：x 536, y 324</code>
+      —— 正是扣除画布原点 (64, 76) 后的画布内坐标</figcaption>
+  </figure>
+
+  <div class="note">
+    指针移出画布时，坐标会退回 <code>x -, y -</code>，而不是冻在最后一个值上 ——
+    否则状态栏会显示一个「光标早就不在那儿」的陈旧坐标。
+  </div>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="about">9. 关于对话框</h2>
+
+  <p>「帮助 → 关于」会打开这个对话框，列出程序信息、作者联系方式与快捷键提示。</p>
+
+  <figure class="shot-mid">
+    <img src="images/about.png" alt="关于对话框">
+    <figcaption>关于对话框。点「确定」或按 <span class="kbd">Esc</span> 关闭</figcaption>
+  </figure>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="demo">10. 完整操作演示</h2>
+
+  <p>
+    下面这段动图把一次完整的使用流程串了起来：选色 → 铅笔画曲线 → 直线 →
+    矩形 → 椭圆 → 区域填充 → 取色 → 展开菜单 → 撤销 → 打开关于对话框。
+    所有帧都是实机录制的真实画面，没有合成。
+  </p>
+
+  <figure>
+    <img src="images/demo.gif" alt="完整操作演示">
+    <figcaption>完整操作流程（约 14 秒，循环播放）</figcaption>
+  </figure>
+
+  <p>演示结束时画布上是这样一幅画：</p>
+  <figure><img src="images/demo-06-picker.png" alt="演示最终画面">
+    <figcaption>四种图形工具 + 填充的合成结果</figcaption></figure>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="reference">11. 速查表</h2>
+
+  <table>
+    <tr><th style="width:26%">我想…</th><th>怎么做</th></tr>
+    <tr><td>开始画一条线</td><td>选铅笔或直线，按住左键拖动，松开结束</td></tr>
+    <tr><td>画一个方框</td><td>选矩形，从左上方按住拖到右下方</td></tr>
+    <tr><td>画一个圆</td><td>选椭圆，拖出它的外接矩形</td></tr>
+    <tr><td>给区域上色</td><td>选填充，在区域内点一下</td></tr>
+    <tr><td>用画布上已有的颜色</td><td>选取色，点那个颜色，它会变成当前色</td></tr>
+    <tr><td>擦掉画错的地方</td><td>选橡皮按住拖动；想整体回退一步就用编辑菜单的「撤销」</td></tr>
+    <tr><td>从头开始</td><td>文件 → 新建，或选「清空」工具</td></tr>
+    <tr><td>退出程序</td><td>文件 → 退出</td></tr>
+    <tr><td>看画布坐标</td><td>看底部状态栏的「位置」</td></tr>
+  </table>
+
+  <!-- ------------------------------------------------------------ -->
+  <h2 id="limits">12. 已知限制</h2>
+
+  <p>诚实列一下当前版本还做不到的事，避免误解：</p>
+
+  <table>
+    <tr><th style="width:30%">限制</th><th>说明</th></tr>
+    <tr><td>不能保存 / 打开文件</td><td>尚未接入 UEFI 的文件系统读写，退出即丢失</td></tr>
+    <tr><td>撤销深度固定 8 层</td><td>每层保存整幅画布快照，大画布下内存占用可观</td></tr>
+    <tr><td>油漆桶大区域偏慢</td><td>逐像素扫描线填充，QEMU 下填满整屏会有可见卡顿</td></tr>
+    <tr><td>标题栏没有窗口按钮</td><td>最小化 / 最大化 / 关闭未实现（UEFI 下无窗口管理器，属装饰性）</td></tr>
+    <tr><td>没有悬停变色</td><td>LVGL 9 无原生 hover 状态；交互反馈由按下态与焦点态承担，悬停只出提示框</td></tr>
+  </table>
+
+  <h3>本轮修复记录（0.1.0.24）</h3>
+  <table>
+    <tr><th style="width:30%">问题</th><th>根因与修复</th></tr>
+    <tr>
+      <td>工具栏图标看不懂是什么功能</td>
+      <td>新增悬浮提示：每拍轮询指针位置做命中判定，停留 0.4 秒后浮出工具名与用法</td>
+    </tr>
+    <tr>
+      <td>笔迹相对光标偏左约 56px</td>
+      <td>画布定位漏加工具栏宽度：<code>rp_set_pos</code> 少传了 <code>area_x</code>，
+        画布实际画在屏幕 x=8，而坐标换算仍按 x=64。现两处共用同一个 <code>cv_x</code>，
+        结构上无法再分叉</td>
+    </tr>
+    <tr>
+      <td>状态栏坐标始终是「- -」</td>
+      <td><code>rp_mouse_pos</code> 取点用了 <code>lv_indev_active()</code>，
+        在键鼠双 indev 工程里会指到键盘上、类型检查失败后直接返回 0。
+        改为直接问鼠标 indev</td>
+    </tr>
+  </table>
+
+  <p>三处修复都做了像素级验证：</p>
+  <figure><img src="images/verify-dots.png" alt="落点验证">
+    <figcaption>在四个位置单击落点，逐点检查像素：全部精确命中光标所在处
+      （并顺带检查左侧 56px 处没有「幽灵墨迹」，即历史偏移未复发）</figcaption></figure>
+
+  <footer>
+    rustupaint 产品手册 · 版本 0.1.0.24 · 构建 20260928_074654<br>
+    作者 Mike Wu · mikewuping@163.com<br>
+    本手册所有截图均由 QEMU 实机运行采集，未经修饰合成（GIF 仅做取景与时长编排）。
+  </footer>
+
+</div>
+</body>
+</html>

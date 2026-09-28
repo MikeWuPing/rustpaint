@@ -1,0 +1,12 @@
+## @file
+# RustPaintPkg package description.
+#
+# Copyright (c) 2026, Mike Wu. All rights reserved.
+#
+##
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = RustPaintPkg
+  PACKAGE_GUID                   = 7C4E1A62-9B03-4F18-9E2D-5A6B1C0D3E71
+  PACKAGE_VERSION                = 0.1

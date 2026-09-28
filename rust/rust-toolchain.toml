@@ -1,0 +1,5 @@
+[toolchain]
+# uefi-rs 的 MSRV 与新稳定版都能用；本工程不依赖 nightly。
+channel = "stable"
+targets = ["x86_64-unknown-uefi"]
+components = ["rustfmt"]

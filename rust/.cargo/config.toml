@@ -1,0 +1,7 @@
+# 默认目标固定为 UEFI，避免每次 cargo 调用都要带 --target。
+#
+# 产物路径随之固定为 rust/target/x86_64-unknown-uefi/<profile>/：
+#   - release: rustupaint.lib（静态库，交给 EDK2 链接）
+# tools/Build-RustPaint.ps1 从这个固定路径取产物，不要手改本文件的 target。
+[build]
+target = "x86_64-unknown-uefi"
