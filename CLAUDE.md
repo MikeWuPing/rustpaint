@@ -168,6 +168,29 @@ set_pos(canvas, X, Y)  →  屏幕位置 = (0 + X, work_y + Y)
 
 `LvglUefiPort.inf` 的 `UsbHidMouse.c` 要发 HID 类请求，消费 `UefiUsbLib`。DSC 里缺这一条会在构建期直接失败（`error 4000: Instance of library class [UefiUsbLib] is not found`）。同类坑在 `D:\AIProject\gsetupmod` 上炸过一次。
 
+### 13b. `git push` 会偶发被本地代理 502 掐断
+
+环境里有 `https_proxy=http://127.0.0.1:6011`，git 走它。间歇性会出现：
+
+```
+fatal: unable to access '...': CONNECT tunnel failed, response 502
+fatal: unable to access '...': schannel: server closed abruptly (missing close_notify)
+```
+
+直连（`-c http.proxy= -c https.proxy=`）不通 —— 出网必须过这个代理；SSH 能到
+`github.com` 但本机没配密钥。所以**别在此时反复 push**：同一分钟连试 7 次全败，等几分钟
+自己就恢复了（实测间隔 45 秒后重试一次即成功）。
+
+判断代理是否活着，别用 git 试：
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -x http://127.0.0.1:6011 https://github.com/
+```
+
+`gh` 走同一条代理但**几乎不受影响**（Go 的 HTTP 栈）。所以代理抽风时，单文件的小改动可以
+用 `gh api -X PUT repos/<owner>/<repo>/contents/<path>` 直接落远端，绕过 git；等代理恢复后再
+`git fetch && git reset --hard origin/main` 对齐（内容相同、commit hash 不同，reset 即可）。
+
 ### 14. Rust 工具链：只走清华源，且不要用 rustup 的 shim
 
 - 官方源 `static.rust-lang.org` 在本机只有 **~18 KB/s**；清华 `https://mirrors.tuna.tsinghua.edu.cn/rustup` 是 **~2.7 MB/s**（快 150 倍）。装法见 `docs/可行性调研.md` 与本文档记忆区。
