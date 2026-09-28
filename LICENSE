@@ -19,12 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Note on dependencies:
-
-`LvglPkg/` (LVGL 9.2.2 — MIT, Copyright (c) LVGL Kft — plus the UEFI port layer)
-is **not distributed with this repository**. It is a separate dependency whose
-upstream is currently private, and it carries its own licence. See the
-"Building from source" section of the README.
