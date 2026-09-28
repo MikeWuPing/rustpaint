@@ -168,8 +168,19 @@ Grab `rustupaint.efi` from
 contains `OVMF_CODE.fd` and `startup.nsh`):
 
 1. On real hardware: copy the files onto a FAT32 USB stick and run
-   `fs0:\rustupaint.efi` from the UEFI Shell.
-2. On a VM: use the QEMU commands in the next section.
+   `fs0:\rustupaint.efi` from the UEFI Shell. The bundle also ships
+   `EFI/BOOT/BOOTX64.EFI`, so the firmware can boot straight off the stick.
+2. On a VM: unzip the bundle and run one command — QEMU's vvfat turns the folder
+   into a boot disk, and OVMF boots `EFI/BOOT/BOOTX64.EFI` directly, so **no UEFI
+   Shell and no disk image are needed**:
+
+   ```powershell
+   qemu-system-x86_64.exe -m 512 -vga std -net none -display sdl -usb -device usb-mouse `
+     -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd `
+     -drive format=raw,file=fat:rw:<unzipped folder>
+   ```
+
+   The bundle also ships `Run-Qemu.ps1` if you prefer to just launch that.
 
 ### Running under QEMU
 

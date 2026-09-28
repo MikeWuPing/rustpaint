@@ -156,9 +156,18 @@ RustInUEFI/
 从 [Releases](https://github.com/MikeWuPing/RustPaintUEFI/releases) 下载
 `rustupaint.efi`（以及同包内的 `OVMF_CODE.fd`、`startup.nsh`）：
 
-1. 把三个文件放进一个 FAT32 格式的 U 盘，U 盘根目录建 `EFI/BOOT/` 结构，或直接让
-   UEFI Shell 从 U 盘启动并执行 `fs0:\rustupaint.efi`。
-2. 虚拟机用户：见下一节的 QEMU 命令。
+1. 真机：把文件放进 FAT32 U 盘，进 UEFI Shell 执行 `fs0:\rustupaint.efi`；bundle 里已备好
+   `EFI/BOOT/BOOTX64.EFI`，固件也可以直接从 U 盘启动它。
+2. 虚拟机：解压 bundle 后一行命令即可 —— QEMU 的 vvfat 会把解压目录直接当启动盘，
+   OVMF 见到 `EFI/BOOT/BOOTX64.EFI` 就直接拉起应用，**不需要 UEFI Shell、不需要做镜像**：
+
+   ```powershell
+   qemu-system-x86_64.exe -m 512 -vga std -net none -display sdl -usb -device usb-mouse `
+     -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd `
+     -drive format=raw,file=fat:rw:<解压目录>
+   ```
+
+   bundle 里也带了 `Run-Qemu.ps1`，双击目录下的它就行。
 
 ### 在 QEMU 里跑
 
