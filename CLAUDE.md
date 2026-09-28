@@ -89,6 +89,21 @@ LVGL 的 RGB888 行可能带对齐填充。`RpShim.c` 用 `lv_draw_buf_width_to_
 
 `firmware/OVMF_CODE.fd` 是**带鼠标驱动的自建 OVMF**，来自 advmemtest 的 vendored 副本，不要换成别的 OVMF（`ContraQwen` 那份没有鼠标驱动）。
 
+### 6b. 发布包：用 vvfat + `EFI/BOOT/BOOTX64.EFI`，可以完全绕开 Shell
+
+日常验证继续用 `mkfatimg.py` 造真镜像（vvfat 的 `try_commit` 在写入场景下会崩，这是
+mkfatimg 存在的原因）。但**只读启动**这个场景 vvfat 是好的，而且配合一个目录结构的改动，
+能省掉整个 Shell 回落链路：
+
+- 目录里放 `EFI/BOOT/BOOTX64.EFI`（就是 `rustupaint.efi` 的副本）→ OVMF 直接从硬盘
+  Boot0002 启动应用，**不进 Shell、不读 `startup.nsh`、不需要 257MB 镜像、不需要 Python**。
+- 只放 `startup.nsh` 而没有 `EFI/BOOT/BOOTX64.EFI` 时，vvfat 盘上 OVMF 会报
+  `failed to load Boot0002 ... Not Found` 然后卡在 "Press any key to enter the Boot
+  Manager Menu"，**等 45 秒也不回落 Shell**（真镜像上同样的布局却能回落）。这条差异是实测出来的。
+
+所以 Release 附件的形态是：解压目录 + `Run-Qemu.ps1`，一条 `-drive format=raw,file=fat:rw:<目录>`
+即可启动。已验证能跑到 `[RustPaint] ui built`。
+
 ### 7. 焦点组的切换只有三个出口
 
 `rebuild_main_group`（主界面）/ `enter_menu` / `enter_dialog`。禁止在别处直接调 `rp_group_add`——会漏掉"先清空再重加"，症状是焦点跑到看不见的对象上。
