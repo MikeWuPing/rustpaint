@@ -56,6 +56,13 @@ rust/src/canvas.rs  ← 画布文档模型与绘制原语（纯像素，不碰 U
 3. 事件走**单一 trampoline**：C 侧把 LVGL event code 译成 `RP_EV_*`、键值译成 `RP_KEY_*` 后调 Rust 注册的函数指针。Rust 侧用打包的 `user` 值（高 8 位类别 + 低 24 位下标）分发，**整套 UI 事件路径零动态分配**。
 4. 新增控件/事件/按键时**两边同时改**，不要透传 LVGL 原始值。
 
+> **纪律要有工具兜底**：`tools/check_abi.py` 比对 `RpShim.h` 与 `rust/src/ffi.rs`
+> 的函数名集合与常量数值（映射规则：C 侧 `RP_EV_PRESSED` ↔ Rust 侧 `EV_PRESSED`，
+> 即剥掉 `RP_` 前缀），有漂移就以退出码 1 报出。`Build-RustPaint.ps1` 在 cargo
+> 之前自动跑它（步骤 1b）；Python 不在 PATH 时打印一行跳过，不中断构建。
+> **常量漏改不会产生任何编译错误**——它只会静默取到错的值（比如 `EV_CLICKED`
+> 取成 9），所以这一步不能省。改完 `RpShim.h` 立刻跑一次。
+
 ## 关键约束与已踩过的坑
 
 ### 1. `.ps1` 注释一律纯 ASCII（硬纪律）

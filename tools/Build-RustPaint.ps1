@@ -95,6 +95,24 @@ $v = & (Join-Path $PSScriptRoot 'New-BuildVersion.ps1') -ProjectRoot $Root -Outp
 Set-Content -Path (Join-Path $Root 'expected_version.txt') -Value $v.VersionString -Encoding ASCII
 Write-Host "    version = $($v.VersionString)"
 
+# ------------------------------------------------------- 1b. ABI drift check
+# RpShim.h and rust/src/ffi.rs are hand-written twins. Adding an rp_* function
+# or an RP_* constant on one side only is NOT a compile error: the mismatch
+# surfaces at link time at best, and silently reads a wrong value at worst.
+# Cheap to check, expensive to miss.
+Write-Step 'ABI drift check (RpShim.h vs ffi.rs)'
+$abiCheck = Join-Path $PSScriptRoot 'check_abi.py'
+$python = Get-Command python -ErrorAction SilentlyContinue
+if (!$python) { $python = Get-Command py -ErrorAction SilentlyContinue }
+if (!$python) {
+  Write-Host '    python not on PATH; skipped' -ForegroundColor Yellow
+} else {
+  & $python.Source $abiCheck
+  if ($LASTEXITCODE -ne 0) {
+    throw "ABI drift: RpShim.h and rust/src/ffi.rs disagree (exit $LASTEXITCODE)"
+  }
+}
+
 # --------------------------------------------------------------- 2. cargo
 $rustLib = ''
 if ($StubRust) {
