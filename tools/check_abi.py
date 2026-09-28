@@ -11,29 +11,30 @@
   - 常量：C 侧 RP_EV_PRESSED -> Rust 侧 EV_PRESSED（剥掉 RP_ 前缀），数值必须相等
 
 用法：
-    python tools/check_abi.py            # 检查，有漂移则以非零码退出
-    python tools/check_abi.py --verbose   # 连一致的符号也列出来
+    python tools/check_abi.py                    # 自动定位，有漂移则非零退出
+    python tools/check_abi.py --verbose          # 连一致的符号也列出来
+    python tools/check_abi.py --header X.h --ffi Y.rs --prefix MY_
+
+默认布局（脚本放在 <repo>/tools/ 下时自动命中）：
+    <repo>/RustPaintPkg/Application/RustPaint/RpShim.h
+    <repo>/rust/src/ffi.rs
+
+换项目时用 --header/--ffi 指定，用 --prefix 改常量前缀（C 侧 RP_FOO 对应
+Rust 侧 FOO；若两侧同名，传 --prefix ''）。--fn-prefix 同理，默认 rp_。
 
 退出码：0 = 一致；1 = 有漂移；2 = 文件找不到。
 """
+import argparse
 import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HEADER = os.path.join(ROOT, "RustPaintPkg", "Application", "RustPaint", "RpShim.h")
-FFI = os.path.join(ROOT, "rust", "src", "ffi.rs")
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+DEFAULT_HEADER = os.path.join(ROOT, "RustPaintPkg", "Application", "RustPaint", "RpShim.h")
+DEFAULT_FFI = os.path.join(ROOT, "rust", "src", "ffi.rs")
 
-# C 侧 #define，值可能是十进制、十六进制、或带括号的简单表达式
-RE_C_DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(.+?)\s*$", re.M)
-# Rust 侧 pub const
-RE_RS_CONST = re.compile(r"^pub const ([A-Z][A-Z0-9_]*)\s*:\s*(\w+)\s*=\s*([^;]+);", re.M)
-# C 侧函数声明：函数名在行首或跟随返回类型，取 rp_ 开头的标识符
-RE_C_FN = re.compile(r"\b(rp_[a-z0-9_]+)\s*\(")
-# Rust 侧 extern 声明
-RE_RS_FN = re.compile(r"\bfn\s+(rp_[a-z0-9_]+)\s*\(")
-
-# C 侧不需要在 Rust 侧有对应物的宏
+# C 侧不需要在 Rust 侧有对应物的宏（include guard 之类）
 IGNORE_DEFINES = {"RP_SHIM_H_"}
 
 
@@ -60,31 +61,53 @@ def parse_int(raw):
         return None
 
 
-def main():
-    verbose = "--verbose" in sys.argv
-    for path in (HEADER, FFI):
+RE_C_DEFINE = re.compile(r"^#define\s+([A-Z][A-Z0-9_]*)\s+(.+?)\s*$", re.M)
+RE_RS_CONST = re.compile(r"^pub const ([A-Z][A-Z0-9_]*)\s*:\s*(\w+)\s*=\s*([^;]+);", re.M)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        description="Check that a C shim header and its Rust extern declarations agree.")
+    ap.add_argument("--header", default=DEFAULT_HEADER, help="C header (the ABI contract)")
+    ap.add_argument("--ffi", default=DEFAULT_FFI, help="Rust extern declaration file")
+    ap.add_argument("--prefix", default="RP_",
+                    help="constant prefix on the C side (stripped on the Rust side); "
+                         "pass '' when both sides use the same names")
+    ap.add_argument("--fn-prefix", default="rp_", help="function prefix, identical on both sides")
+    ap.add_argument("--verbose", action="store_true", help="list every symbol, not just the summary")
+    args = ap.parse_args(argv)
+
+    header, ffi, prefix, fn_prefix = args.header, args.ffi, args.prefix, args.fn_prefix
+    for path in (header, ffi):
         if not os.path.exists(path):
             print("missing: %s" % path)
             return 2
 
-    with open(HEADER, encoding="utf-8", errors="replace") as f:
+    with open(header, encoding="utf-8", errors="replace") as f:
         c_text = strip_c_comments(f.read())
-    with open(FFI, encoding="utf-8", errors="replace") as f:
+    with open(ffi, encoding="utf-8", errors="replace") as f:
         rs_text = strip_rs_comments(f.read())
 
-    # --- 函数 ---
-    c_fns = set(RE_C_FN.findall(c_text))
-    rs_fns = set(RE_RS_FN.findall(rs_text))
+    # --- 函数：两侧同名 ---
+    re_c_fn = re.compile(r"\b(%s[a-z0-9_]+)\s*\(" % re.escape(fn_prefix))
+    re_rs_fn = re.compile(r"\bfn\s+(%s[a-z0-9_]+)\s*\(" % re.escape(fn_prefix))
+    c_fns = set(re_c_fn.findall(c_text))
+    rs_fns = set(re_rs_fn.findall(rs_text))
 
-    # --- 常量 ---
+    # --- 常量：C 侧带 prefix，Rust 侧剥掉 prefix ---
     c_consts = {}
     for name, raw in RE_C_DEFINE.findall(c_text):
         if name in IGNORE_DEFINES:
+            continue
+        if prefix and not name.startswith(prefix):
             continue
         c_consts[name] = parse_int(raw)
     rs_consts = {}
     for name, _ty, raw in RE_RS_CONST.findall(rs_text):
         rs_consts[name] = parse_int(raw)
+
+    def to_rust_name(name):
+        return name[len(prefix):] if prefix and name.startswith(prefix) else name
 
     problems = []
 
@@ -98,9 +121,9 @@ def main():
     const_missing = []
     const_mismatch = []
     for name, val in sorted(c_consts.items()):
-        rs_name = name[len("RP_"):] if name.startswith("RP_") else name
+        rs_name = to_rust_name(name)
         if rs_name not in rs_consts:
-            const_missing.append("%s (期望 Rust 侧 %s)" % (name, rs_name))
+            const_missing.append("%s (expected %s on the Rust side)" % (name, rs_name))
             continue
         if val is None or rs_consts[rs_name] is None:
             continue
@@ -111,29 +134,29 @@ def main():
     if const_mismatch:
         problems.append("const: value mismatch -> %s" % "; ".join(const_mismatch))
 
-    rs_extra = sorted(n for n in rs_consts if ("RP_" + n) not in c_consts and n not in c_consts)
+    rs_extra = sorted(n for n in rs_consts
+                      if (prefix + n) not in c_consts and n not in c_consts)
     if rs_extra:
         problems.append("const: on Rust side only -> %s" % ", ".join(rs_extra))
 
-    print("RpShim.h    : %d functions, %d constants" % (len(c_fns), len(c_consts)))
-    print("ffi.rs      : %d functions, %d constants" % (len(rs_fns), len(rs_consts)))
-    print("functions matched    : %d" % len(c_fns & rs_fns))
-    print("constants compared   : %d" % sum(1 for n in c_consts
-                                   if (n[len("RP_"):] if n.startswith("RP_") else n) in rs_consts))
+    print("header      : %s" % header)
+    print("ffi         : %s" % ffi)
+    print("functions   : %d in C, %d in Rust, %d matched"
+          % (len(c_fns), len(rs_fns), len(c_fns & rs_fns)))
+    print("constants   : %d compared" % sum(1 for n in c_consts if to_rust_name(n) in rs_consts))
     print()
     if problems:
         for p in problems:
             print("[DRIFT] %s" % p)
         return 1
-    print("OK: RpShim.h and ffi.rs agree")
-    if verbose:
+    print("OK: %s and %s agree" % (os.path.basename(header), os.path.basename(ffi)))
+    if args.verbose:
         print("\n--- functions ---")
         for n in sorted(c_fns):
             print("  %s" % n)
         print("\n--- constants ---")
         for n in sorted(c_consts):
-            rs_name = n[len("RP_"):] if n.startswith("RP_") else n
-            print("  %-24s -> %-20s = %s" % (n, rs_name, c_consts[n]))
+            print("  %-24s -> %-20s = %s" % (n, to_rust_name(n), c_consts[n]))
     return 0
 
 
